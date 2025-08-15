@@ -1,0 +1,5 @@
+# Ignore exe build outputs
+*.exe
+*.log
+# PowerShell temp
+*.ps1xml

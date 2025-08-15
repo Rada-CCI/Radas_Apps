@@ -1,0 +1,75 @@
+I want to build a .exe that will automatically set the following parameters:
+- Power SETTINGS
+- Windows Search: Edit power plan --> Change advanced power settings
+- Turn off hard disk after: 0 (NEVER) (on battery and plugged in)
+- Sleep after: NEVER (on battery and plugged in)
+- Turn off display after : NEVER (on battery and plugged in)
+* Windows+R --> powercfg.cpl --> Choose what power buttons do
+- When I press the power button: Do nothing (prevents unintended shutdown/sleep)
+- When I press the sleep button: Do nothing (prevents unintended shutdown/sleep)
+- Taskbar SETTINGS
+- Search: Search icon only
+- Task view: ON
+- Widgets: OFF
+- Other system tray icons:
+- Safely Remove Hardware and Eject Media: ON
+- Taskbar behaviors
+- Taskbar alignment: center
+- Automatically hide the taskbar: UN-CHECK
+- Show badges: CHECK
+- Show flashing: CHECK
+- Show taskbar on all displays: CHECK
+- When using multiple displays, show my taskbar apps on: ALL TASKBARS
+- Share any window from the taskbar: CHECK
+- Select the far corner of the taskbar to show the desktop: CHECK
+- Combine taskbar buttons and hide labels: NEVER
+- Combine taskbar buttons and hide labels on other taskbars: NEVER
+- Show smaller taskbar buttons: WHEN TASKBAR IS FULL
+- Date & time
+- Set Time Zone for location
+- Sync now
+- Notifications
+- OFF
+- Do not disturb: ON
+- Additional settings
+- Show the Windows welcome experience after updates and when signe din to show what's new and suggested: OFF
+- Suggest ways to get the most out of Windows and finish setting up this device: OFF
+- Get tips and suggestions when using Windows: OFF
+- Windows Updates
+- Update everything until there is nothing left to update
+- Windows > Services > Windows Update > Stop the service
+- Personalization > Themes
+- Background - CC Background with support info
+- dark theme
+-Windows color - Custom Color - #F18232
+
+
+
+
+
+Create GUI for this application with the following inputs:
+1. "Customer Name" - this should be an text input field 
+2. "Type of Computer" - This should be a dropdown box with the following inputs: "Console" ; "Laptop" ; "Rack PC" ; "Desktop".
+3. "Serial Number" - This should be a number input only field
+4. "Custom Name" - This should be a text input field with the following limitations
+     - 15 characters max
+     - no special characters except for "-" and "_"
+     - Any spaces are converted to "-"
+
+Below the inputs needs to be a text display labelled "New Comptuer Name"that will do one of the follow:
+1. combine the first three input fields and assign a "-" to any spaces using the following format: [Customer Name]-[Type of Computer]-[Serial Number]
+     - The [Type of Computer] output should be a single character with the following scheme:
+          - "Console"="C"
+          - "Laptop"="L"
+          - "Rack PC"="R"
+          - "Desktop"="D"
+2. If there is any input into the "Custome Name" field, disregard the first three boxes and use only the text entered into the "Custom Name" field.
+
+Once a name has been generated, a button called "Accept new computer name" should become available. Once this button is pressed, there needs to be a confirmation window. If confirmed "Ok", change the computer name to the "New Computer Name"
+
+
+
+
+make a copy of the current background image and imbed into the program as the default background. Add a small preview section so the user can see what the background will change to.
+
+Adjust the application window size so that everything fits by default. Allow the application window to be resized, maximized and minimized.
