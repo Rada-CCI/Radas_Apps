@@ -1,0 +1,62 @@
+name: Build and release on tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build (Windows) and create Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow
+        shell: pwsh
+
+      - name: Build exe with PyInstaller
+        working-directory: windows-configurator
+        run: |
+          # build single-file, windowed exe and include assets directory
+          python -m PyInstaller --onefile --windowed --uac-admin --add-data "assets;assets" computer_namer_gui.py
+        shell: pwsh
+
+      - name: Package release zip
+        working-directory: windows-configurator
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $zip = "CCI_New_PC_Setup_$tag.zip"
+          # Create zip containing the produced exe, the README, and assets
+          Compress-Archive -Path .\dist\computer_namer_gui.exe, .\README_computer_namer.md, (Get-ChildItem -Path .\assets -Recurse | ForEach-Object FullName) -DestinationPath $zip -Force
+          Write-Host "Created package: $zip"
+        shell: pwsh
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body: |
+            Automated build for tag ${{ github.ref_name }}. The attached zip contains the single-file Windows exe and supporting assets/README.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset (zip)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: windows-configurator/CCI_New_PC_Setup_${{ github.ref_name }}.zip
+          asset_name: CCI_New_PC_Setup_${{ github.ref_name }}.zip
+          asset_content_type: application/zip

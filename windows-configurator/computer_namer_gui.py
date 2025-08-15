@@ -10,6 +10,7 @@ import os
 import shutil
 from pathlib import Path
 import app_version as _av
+import sys
 
 # Optional Pillow for better image resizing; fallback to Tk PhotoImage
 try:
@@ -32,6 +33,17 @@ def is_admin():
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
     except Exception:
         return False
+
+
+def _resource_path(rel_path: str) -> str:
+    """Return an absolute path to a resource, working when running in a PyInstaller one-file bundle.
+
+    If running frozen, PyInstaller extracts files to sys._MEIPASS; otherwise use the script directory.
+    """
+    base = getattr(sys, '_MEIPASS', None)
+    if base:
+        return os.path.join(base, rel_path)
+    return os.path.join(os.path.dirname(__file__), rel_path)
 
 
 def sanitize_custom(name: str) -> str:
@@ -219,109 +231,129 @@ class ComputerNamerApp(tk.Tk):
         right.columnconfigure(0, weight=1)
 
         ttk.Label(inputs, text="Apply the following system settings (best-effort):").grid(column=0, row=0, sticky="w", pady=(0,6))
-        ttk.Checkbutton(inputs, text="Power (never sleep/display/disk)", variable=self.apply_power_var).grid(column=0, row=1, sticky="w")
-        # Sub-options for button/lid actions (appear indented visually by padding)
-        ttk.Checkbutton(inputs, text="Power button -> Do nothing", variable=self.power_button_do_nothing_var).grid(column=0, row=2, sticky="w", padx=(24,0), pady=(2,0))
-        ttk.Checkbutton(inputs, text="Sleep button -> Do nothing", variable=self.sleep_button_do_nothing_var).grid(column=0, row=3, sticky="w", padx=(24,0), pady=(2,0))
-        ttk.Checkbutton(inputs, text="Lid close -> Do nothing (laptops)", variable=self.lid_close_do_nothing_var).grid(column=0, row=4, sticky="w", padx=(24,0), pady=(2,0))
-        ttk.Checkbutton(inputs, text="Taskbar settings", variable=self.apply_taskbar_var).grid(column=0, row=5, sticky="w")
-        ttk.Checkbutton(inputs, text="Date & Time (sync and timezone if provided)", variable=self.apply_datetime_var).grid(column=0, row=6, sticky="w")
-        ttk.Checkbutton(inputs, text="Notifications / Do Not Disturb", variable=self.apply_notifications_var).grid(column=0, row=7, sticky="w")
-        ttk.Checkbutton(inputs, text="Windows Update (run then stop service)", variable=self.apply_windowsupdate_var).grid(column=0, row=8, sticky="w")
-        ttk.Checkbutton(inputs, text="Personalization (dark + accent + background)", variable=self.apply_personalization_var).grid(column=0, row=9, sticky="w")
 
-        ttk.Label(inputs, text="Time Zone ID (optional):").grid(column=0, row=10, sticky="w", pady=(8,0))
-        ttk.Entry(inputs, textvariable=self.tz_var, width=40).grid(column=0, row=11, sticky="w")
+        # Use a Treeview so settings can be grouped and expanded/collapsed
+        self.settings_tree = ttk.Treeview(inputs, show='tree')
+        self.settings_tree.grid(column=0, row=1, sticky="nsew")
+        inputs.rowconfigure(1, weight=1)
+
+        # Build a mapping from tree items to BooleanVars so toggles update state
+        self._tree_item_map = {}
+
+        # Helper to insert items and remember the var mapping
+        def _ins(parent, text, var):
+            iid = self.settings_tree.insert(parent, 'end', text=text)
+            self._tree_item_map[iid] = var
+            # initialize display text with checkbox marker
+            self._update_tree_item_text(iid)
+            return iid
+
+        # Top-level groups
+        power_grp = self.settings_tree.insert('', 'end', text='Power')
+        taskbar_grp = self.settings_tree.insert('', 'end', text='Taskbar')
+        datetime_grp = self.settings_tree.insert('', 'end', text='Date & Time')
+        notifications_grp = self.settings_tree.insert('', 'end', text='Notifications')
+        windowsupdate_grp = self.settings_tree.insert('', 'end', text='Windows Update')
+        personalization_grp = self.settings_tree.insert('', 'end', text='Personalization')
+
+        # Power group children
+        _ins(power_grp, 'Power (never sleep/display/disk)', self.apply_power_var)
+        _ins(power_grp, 'Power button -> Do nothing', self.power_button_do_nothing_var)
+        _ins(power_grp, 'Sleep button -> Do nothing', self.sleep_button_do_nothing_var)
+        _ins(power_grp, 'Lid close -> Do nothing (laptops)', self.lid_close_do_nothing_var)
+
+        # Taskbar
+        _ins(taskbar_grp, 'Taskbar settings', self.apply_taskbar_var)
+
+        # Date & Time
+        _ins(datetime_grp, 'Date & Time (sync and timezone if provided)', self.apply_datetime_var)
+
+        # Notifications
+        _ins(notifications_grp, 'Notifications / Do Not Disturb', self.apply_notifications_var)
+
+        # Windows Update
+        _ins(windowsupdate_grp, 'Windows Update (run then stop service)', self.apply_windowsupdate_var)
+
+        # Personalization
+        _ins(personalization_grp, 'Personalization (dark + accent + background)', self.apply_personalization_var)
+
+        # Allow toggling items with single-click; clicking a top-level/group toggles all children
+        self.settings_tree.bind('<Button-1>', self._on_tree_click)
+
+        # Time Zone entry remains below the tree
+        ttk.Label(inputs, text="Time Zone ID (optional):").grid(column=0, row=2, sticky="w", pady=(8,0))
+        ttk.Entry(inputs, textvariable=self.tz_var, width=40).grid(column=0, row=3, sticky="w")
 
         # action buttons
         ttk.Button(inputs, text="Preview actions", command=self._preview_system_actions).grid(column=0, row=12, pady=(12,0), sticky="w")
         ttk.Button(inputs, text="Apply selected settings", command=self._apply_system_settings).grid(column=0, row=12, pady=(12,0), sticky="e")
 
         # Right-side: function toggles and planned changes checklist
-        toggles_frame = ttk.LabelFrame(right, text="Select functions to run")
-        toggles_frame.grid(column=0, row=0, sticky="ew", pady=(0,6))
-        toggles_frame.columnconfigure(0, weight=1)
+    # 'Select functions to run' section removed - settings are controlled by the left Treeview
 
-        # add per-function toggles (Do* flags)
-        self.do_powersettings_var = tk.BooleanVar(value=True)
-        self.do_taskbar_var = tk.BooleanVar(value=True)
-        self.do_datetime_var = tk.BooleanVar(value=True)
-        self.do_notifications_var = tk.BooleanVar(value=True)
-        self.do_windowsupdate_var = tk.BooleanVar(value=False)
-        self.do_personalization_var = tk.BooleanVar(value=True)
-        self.do_powerbuttonactions_var = tk.BooleanVar(value=True)
+        checklist_frame = ttk.LabelFrame(right, text="Planned changes")
+        checklist_frame.grid(column=0, row=1, sticky="nsew", pady=(8,0))
+        checklist_frame.columnconfigure(0, weight=0)
+        checklist_frame.columnconfigure(1, weight=1)
 
-        ttk.Checkbutton(toggles_frame, text="Power timeouts", variable=self.do_powersettings_var).grid(column=0, row=0, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Taskbar", variable=self.do_taskbar_var).grid(column=0, row=1, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Date & Time", variable=self.do_datetime_var).grid(column=0, row=2, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Notifications", variable=self.do_notifications_var).grid(column=0, row=3, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Windows Update", variable=self.do_windowsupdate_var).grid(column=0, row=4, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Personalization", variable=self.do_personalization_var).grid(column=0, row=5, sticky="w")
-        ttk.Checkbutton(toggles_frame, text="Power button/lid actions", variable=self.do_powerbuttonactions_var).grid(column=0, row=6, sticky="w")
+        # Allow the right column to expand for the live preview area
+        right.grid_rowconfigure(2, weight=1)
 
-    checklist_frame = ttk.LabelFrame(right, text="Planned changes")
-    checklist_frame.grid(column=0, row=1, sticky="nsew", pady=(8,0))
-    checklist_frame.columnconfigure(0, weight=0)
-    checklist_frame.columnconfigure(1, weight=1)
+        # Live preview area (embedded in System Settings tab)
+        preview_out_frame = ttk.LabelFrame(right, text="Preview output")
+        preview_out_frame.grid(column=0, row=2, sticky="nsew", pady=(8,0))
+        preview_out_frame.columnconfigure(0, weight=1)
+        preview_out_frame.rowconfigure(0, weight=1)
 
-    # Allow the right column to expand for the live preview area
-    right.grid_rowconfigure(2, weight=1)
+        # toolbar for preview
+        pf_toolbar = ttk.Frame(preview_out_frame)
+        pf_toolbar.grid(column=0, row=1, sticky="ew", pady=(6,4))
+        pf_toolbar.columnconfigure(0, weight=1)
 
-    # Live preview area (embedded in System Settings tab)
-    preview_out_frame = ttk.LabelFrame(right, text="Preview output")
-    preview_out_frame.grid(column=0, row=2, sticky="nsew", pady=(8,0))
-    preview_out_frame.columnconfigure(0, weight=1)
-    preview_out_frame.rowconfigure(0, weight=1)
+        ttk.Button(pf_toolbar, text="Open last preview", command=lambda: self._open_last_preview()).pack(side='left')
+        ttk.Button(pf_toolbar, text="Clear", command=lambda: self._clear_preview()).pack(side='left', padx=(6,4))
+        ttk.Button(pf_toolbar, text="Save...", command=lambda: self._save_preview()).pack(side='left')
 
-    # toolbar for preview
-    pf_toolbar = ttk.Frame(preview_out_frame)
-    pf_toolbar.grid(column=0, row=1, sticky="ew", pady=(6,4))
-    pf_toolbar.columnconfigure(0, weight=1)
+        # text widget for live output
+        self.preview_text = tk.Text(preview_out_frame, wrap='none')
+        self.preview_text.grid(column=0, row=0, sticky='nsew')
+        self.preview_text.config(state='disabled')
 
-    ttk.Button(pf_toolbar, text="Open last preview", command=lambda: self._open_last_preview()).pack(side='left')
-    ttk.Button(pf_toolbar, text="Clear", command=lambda: self._clear_preview()).pack(side='left', padx=(6,4))
-    ttk.Button(pf_toolbar, text="Save...", command=lambda: self._save_preview()).pack(side='left')
+        vsb2 = ttk.Scrollbar(preview_out_frame, orient='vertical', command=self.preview_text.yview)
+        vsb2.grid(column=1, row=0, sticky='ns')
+        self.preview_text.configure(yscrollcommand=vsb2.set)
+        hsb2 = ttk.Scrollbar(preview_out_frame, orient='horizontal', command=self.preview_text.xview)
+        hsb2.grid(column=0, row=2, sticky='ew')
+        self.preview_text.configure(xscrollcommand=hsb2.set)
 
-    # text widget for live output
-    self.preview_text = tk.Text(preview_out_frame, wrap='none')
-    self.preview_text.grid(column=0, row=0, sticky='nsew')
-    self.preview_text.config(state='disabled')
-
-    vsb2 = ttk.Scrollbar(preview_out_frame, orient='vertical', command=self.preview_text.yview)
-    vsb2.grid(column=1, row=0, sticky='ns')
-    self.preview_text.configure(yscrollcommand=vsb2.set)
-    hsb2 = ttk.Scrollbar(preview_out_frame, orient='horizontal', command=self.preview_text.xview)
-    hsb2.grid(column=0, row=2, sticky='ew')
-    self.preview_text.configure(xscrollcommand=hsb2.set)
-
-    # track last preview file
-    self._last_preview_path = None
+        # track last preview file
+        self._last_preview_path = None
 
         # Define the granular planned actions and how they map to the top-level checkboxes
         self._detailed_plan = [
-            ("Power button -> Do nothing", lambda: self.apply_power_var.get() and self.power_button_do_nothing_var.get() and self.do_powerbuttonactions_var.get()),
-            ("Sleep button -> Do nothing", lambda: self.apply_power_var.get() and self.sleep_button_do_nothing_var.get() and self.do_powerbuttonactions_var.get()),
-            ("Lid close -> Do nothing", lambda: self.apply_power_var.get() and self.lid_close_do_nothing_var.get() and self.do_powerbuttonactions_var.get()),
-            ("Disk timeout (AC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Disk timeout (DC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Monitor timeout (AC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Monitor timeout (DC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Standby timeout (AC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Standby timeout (DC)", lambda: self.apply_power_var.get() and self.do_powersettings_var.get()),
-            ("Taskbar alignment (center)", lambda: self.apply_taskbar_var.get() and self.do_taskbar_var.get()),
-            ("Taskbar size (default)", lambda: self.apply_taskbar_var.get() and self.do_taskbar_var.get()),
-            ("Open Taskbar settings UI", lambda: self.apply_taskbar_var.get() and self.do_taskbar_var.get()),
-            ("Set Time Zone (if provided)", lambda: self.apply_datetime_var.get() and self.do_datetime_var.get() and bool(self.tz_var.get().strip())),
-            ("Sync time now (w32tm /resync)", lambda: self.apply_datetime_var.get() and self.do_datetime_var.get()),
-            ("Disable toasts (PushNotifications::ToastEnabled=0)", lambda: self.apply_notifications_var.get() and self.do_notifications_var.get()),
-            ("Set Focus Assist policy (QuietHours)", lambda: self.apply_notifications_var.get() and self.do_notifications_var.get()),
-            ("Open Notifications settings UI", lambda: self.apply_notifications_var.get() and self.do_notifications_var.get()),
-            ("Install/Use PSWindowsUpdate module", lambda: self.apply_windowsupdate_var.get() and self.do_windowsupdate_var.get()),
-            ("Run Windows Update via PSWindowsUpdate", lambda: self.apply_windowsupdate_var.get() and self.do_windowsupdate_var.get()),
-            ("Stop and disable wuauserv", lambda: self.apply_windowsupdate_var.get() and self.do_windowsupdate_var.get()),
-            ("Set dark theme (Apps/System)", lambda: self.apply_personalization_var.get() and self.do_personalization_var.get()),
-            ("Set accent color", lambda: self.apply_personalization_var.get() and self.do_personalization_var.get()),
-            ("Set desktop background (provided or sample)", lambda: self.apply_personalization_var.get() and self.do_personalization_var.get()),
+            ("Power button -> Do nothing", lambda: self.apply_power_var.get() and self.power_button_do_nothing_var.get()),
+            ("Sleep button -> Do nothing", lambda: self.apply_power_var.get() and self.sleep_button_do_nothing_var.get()),
+            ("Lid close -> Do nothing", lambda: self.apply_power_var.get() and self.lid_close_do_nothing_var.get()),
+            ("Disk timeout (AC)", lambda: self.apply_power_var.get()),
+            ("Disk timeout (DC)", lambda: self.apply_power_var.get()),
+            ("Monitor timeout (AC)", lambda: self.apply_power_var.get()),
+            ("Monitor timeout (DC)", lambda: self.apply_power_var.get()),
+            ("Standby timeout (AC)", lambda: self.apply_power_var.get()),
+            ("Standby timeout (DC)", lambda: self.apply_power_var.get()),
+            ("Taskbar alignment (center)", lambda: self.apply_taskbar_var.get()),
+            ("Taskbar size (default)", lambda: self.apply_taskbar_var.get()),
+            ("Open Taskbar settings UI", lambda: self.apply_taskbar_var.get()),
+            ("Set Time Zone (if provided)", lambda: self.apply_datetime_var.get() and bool(self.tz_var.get().strip())),
+            ("Sync time now (w32tm /resync)", lambda: self.apply_datetime_var.get()),
+            ("Disable toasts (PushNotifications::ToastEnabled=0)", lambda: self.apply_notifications_var.get()),
+            ("Set Focus Assist policy (QuietHours)", lambda: self.apply_notifications_var.get()),
+            ("Open Notifications settings UI", lambda: self.apply_notifications_var.get()),
+            ("Install/Use PSWindowsUpdate module", lambda: self.apply_windowsupdate_var.get()),
+            ("Run Windows Update via PSWindowsUpdate", lambda: self.apply_windowsupdate_var.get()),
+            ("Stop and disable wuauserv", lambda: self.apply_windowsupdate_var.get()),
+            ("Set dark theme (Apps/System)", lambda: self.apply_personalization_var.get()),
+            ("Set accent color", lambda: self.apply_personalization_var.get()),
+            ("Set desktop background (provided or sample)", lambda: self.apply_personalization_var.get()),
         ]
 
         # create small image icons (try to load PNGs from assets; otherwise create simple colored squares)
@@ -393,9 +425,24 @@ class ComputerNamerApp(tk.Tk):
                     pass
 
         # attach var traces to update the checklist when selections change
-        for v in (self.apply_power_var, self.apply_taskbar_var, self.apply_datetime_var, self.apply_notifications_var, self.apply_windowsupdate_var, self.apply_personalization_var, self.tz_var, self.bg_path_var, self.power_button_do_nothing_var, self.sleep_button_do_nothing_var, self.lid_close_do_nothing_var, self.do_powersettings_var, self.do_taskbar_var, self.do_datetime_var, self.do_notifications_var, self.do_windowsupdate_var, self.do_personalization_var, self.do_powerbuttonactions_var):
+        for v in (self.apply_power_var, self.apply_taskbar_var, self.apply_datetime_var, self.apply_notifications_var, self.apply_windowsupdate_var, self.apply_personalization_var, self.tz_var, self.bg_path_var, self.power_button_do_nothing_var, self.sleep_button_do_nothing_var, self.lid_close_do_nothing_var):
             try:
-                v.trace_add("write", lambda *_, __=None: self._update_checklist())
+                def _trace_cb(*_args, var=v):
+                    # update main checklist labels
+                    try:
+                        self._update_checklist()
+                    except Exception:
+                        pass
+                    # if we have a settings tree, update mapped items
+                    try:
+                        if hasattr(self, '_tree_item_map'):
+                            for iid, mapped_var in self._tree_item_map.items():
+                                if mapped_var is var:
+                                    self._update_tree_item_text(iid)
+                    except Exception:
+                        pass
+
+                v.trace_add("write", _trace_cb)
             except Exception:
                 pass
 
@@ -423,7 +470,10 @@ class ComputerNamerApp(tk.Tk):
         self.bg_entry = ttk.Entry(ctrl_frame, textvariable=self.bg_path_var, width=60)
         self.bg_entry.grid(column=0, row=1, sticky="ew", pady=(2,0))
         ttk.Button(ctrl_frame, text="Browse…", command=self._browse_bg).grid(column=1, row=1, sticky="w", padx=(6,0))
-        ttk.Label(ctrl_frame, text="If empty, a sample corporate wallpaper will be used.").grid(column=0, row=2, columnspan=2, sticky="w", pady=(6,0))
+        # Apply background now button
+        ctrl_frame.columnconfigure(1, weight=0)
+        ttk.Button(ctrl_frame, text="Apply background", command=self._apply_background).grid(column=2, row=1, sticky="w", padx=(6,0))
+        ttk.Label(ctrl_frame, text="If empty, a sample corporate wallpaper will be used.").grid(column=0, row=2, columnspan=3, sticky="w", pady=(6,0))
 
         # When bg path changes, reload preview and update checklist
         try:
@@ -475,6 +525,73 @@ class ComputerNamerApp(tk.Tk):
             self.accept_btn.config(state="normal")
         else:
             self.accept_btn.config(state="disabled")
+
+    def _update_tree_item_text(self, item_iid):
+        """Update a tree item's displayed text to include a checkbox marker based on its mapped BooleanVar."""
+        var = self._tree_item_map.get(item_iid)
+        if var is None:
+            return
+        base_text = self.settings_tree.item(item_iid, 'text')
+        # strip any existing marker
+        if base_text.startswith('[x] ' ) or base_text.startswith('[ ] '):
+            base_text = base_text[4:]
+        marker = '[x]' if var.get() else '[ ]'
+        self.settings_tree.item(item_iid, text=f"{marker} {base_text}")
+
+    def _on_tree_doubleclick(self, event):
+        iid = self.settings_tree.identify_row(event.y)
+        if not iid:
+            return
+        var = self._tree_item_map.get(iid)
+        if var is None:
+            # might be a group; ignore
+            return
+        # toggle the var
+        var.set(not var.get())
+        # update text
+        self._update_tree_item_text(iid)
+
+
+    def _on_tree_click(self, event):
+        """Single-click handler: toggles leaf items, or selects/deselects all descendants for groups."""
+        iid = self.settings_tree.identify_row(event.y)
+        if not iid:
+            return
+
+        # If this item is mapped to a BooleanVar, toggle it
+        if iid in self._tree_item_map:
+            var = self._tree_item_map[iid]
+            var.set(not var.get())
+            self._update_tree_item_text(iid)
+            try:
+                self._update_checklist()
+            except Exception:
+                pass
+            return
+
+        # Otherwise treat it as a group: gather descendant mapped items and toggle them all
+        def _gather_descendants(item):
+            items = []
+            for child in self.settings_tree.get_children(item):
+                if child in self._tree_item_map:
+                    items.append(child)
+                items.extend(_gather_descendants(child))
+            return items
+
+        descendants = _gather_descendants(iid)
+        if not descendants:
+            return
+
+        # If any descendant is unchecked, set all to True; otherwise set all to False
+        any_unchecked = any(not self._tree_item_map[d].get() for d in descendants)
+        for d in descendants:
+            self._tree_item_map[d].set(any_unchecked)
+            self._update_tree_item_text(d)
+        try:
+            self._update_checklist()
+        except Exception:
+            pass
+
 
     def _on_accept(self):
         name = self.generated_var.get()
@@ -573,7 +690,7 @@ class ComputerNamerApp(tk.Tk):
                 lbl.config(foreground="gray")
 
     def _preview_system_actions(self):
-        script = os.path.join(os.path.dirname(__file__), 'configure-windows.ps1')
+        script = _resource_path('configure-windows.ps1')
         if not os.path.exists(script):
             messagebox.showerror("Script not found", f"Could not find {script}")
             return
@@ -666,7 +783,7 @@ class ComputerNamerApp(tk.Tk):
         ttk.Button(btn_frame, text='Close', command=win.destroy).pack(side='right', pady=6)
 
     def _apply_system_settings(self):
-        script = os.path.join(os.path.dirname(__file__), 'configure-windows.ps1')
+        script = _resource_path('configure-windows.ps1')
         if not os.path.exists(script):
             messagebox.showerror("Script not found", f"Could not find {script}")
             return
@@ -712,6 +829,30 @@ class ComputerNamerApp(tk.Tk):
         except subprocess.CalledProcessError as e:
             messagebox.showerror("Apply failed", f"PowerShell configurator failed: {e}")
 
+    def _apply_background(self):
+        """Apply the selected background immediately by running the PowerShell configurator with -BackgroundPath.
+
+        This operation requires Administrator privileges because setting the system wallpaper may change system settings.
+        """
+        script = _resource_path('configure-windows.ps1')
+        if not os.path.exists(script):
+            messagebox.showerror("Script not found", f"Could not find {script}")
+            return
+        if not is_admin():
+            messagebox.showerror("Administrator required", "Applying the background requires Administrator privileges. Run this program elevated and try again.")
+            return
+        bg = self.bg_path_var.get().strip() or (str(self.default_bg_path) if self.default_bg_path.exists() else "")
+        if not bg or not os.path.exists(bg):
+            messagebox.showerror("Background not found", "Selected background file does not exist.")
+            return
+        if not messagebox.askyesno("Apply background", f"Apply the selected background now?\n{bg}"):
+            return
+        try:
+            cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-BackgroundPath", bg]
+            subprocess.run(cmd, check=True)
+            messagebox.showinfo("Background applied", "Background applied successfully.")
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Apply failed", f"Failed to apply background: {e}")
 
 if __name__ == "__main__":
     app = ComputerNamerApp()

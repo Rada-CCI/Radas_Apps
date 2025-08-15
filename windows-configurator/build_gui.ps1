@@ -1,6 +1,7 @@
 param(
     [string]$BaseName = "CCI_New_PC_Setup",
-    [string]$Script = "computer_namer_gui.py"
+    [string]$Script = "computer_namer_gui.py",
+    [switch]$Console
 )
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -26,7 +27,11 @@ Write-Host "Building $outname"
 
 # Run PyInstaller (must be on PATH - uses user's Python)
 # Script runs with working directory set to the script folder, so reference local paths.
-py -3 -m PyInstaller --onefile --windowed --uac-admin --add-data "assets;assets" "$Script"
+if ($Console) {
+    py -3 -m PyInstaller --onefile --uac-admin --add-data "assets;assets" --add-data "configure-windows.ps1;." "$Script"
+} else {
+    py -3 -m PyInstaller --onefile --windowed --uac-admin --add-data "assets;assets" --add-data "configure-windows.ps1;." "$Script"
+}
 
 # Move produced exe
 $dist = Join-Path $root 'dist' 
