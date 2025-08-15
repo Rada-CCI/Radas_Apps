@@ -25,7 +25,8 @@ $outname = "$safe`_v$new.exe"
 Write-Host "Building $outname"
 
 # Run PyInstaller (must be on PATH - uses user's Python)
-py -3 -m PyInstaller --onefile --windowed --uac-admin --add-data "windows-configurator\assets;assets" "windows-configurator\$Script"
+# Script runs with working directory set to the script folder, so reference local paths.
+py -3 -m PyInstaller --onefile --windowed --uac-admin --add-data "assets;assets" "$Script"
 
 # Move produced exe
 $dist = Join-Path $root 'dist' 
