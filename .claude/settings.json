@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__github__actions_run_trigger",
+      "mcp__github__request_copilot_review",
+      "mcp__github__run_secret_scanning",
+      "Edit(/.github/workflows/**)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)",
+      "Bash(gh codespace *)",
+      "Bash(gh release *)",
+      "Bash(git lfs *)"
+    ]
+  }
+}
