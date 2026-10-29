@@ -12,4 +12,4 @@ Builds never run on GitHub (Brandon, 2026-10-29), so they use none of the organi
 
 ## Read-only repos
 
-PublicDocumentation and every Stagehand and Spikemark repo are read only (Brandon, 2026-10-29): read them as sources, but never commit, push, branch, open pull requests or issues, comment, or add settings or workflow files there. Changes they need go to Brandon as a note (in Rada-Training-and-Docs: `REVIEW-NOTES.md` or `ACTION-ITEMS.md`).
+PublicDocumentation and every Stagehand and Spikemark repo are read only on GitHub (Brandon, 2026-10-29): read them as sources, and experimenting on a local branch in a clone is fine, but never push anything to them (no branches, commits, tags, pull requests, issues, comments, settings or workflow files on GitHub). Changes they need go to Brandon as a note (in Rada-Training-and-Docs: `REVIEW-NOTES.md` or `ACTION-ITEMS.md`).
