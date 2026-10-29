@@ -9,3 +9,7 @@ GitHub Actions minutes, Codespaces, Packages, Git LFS storage and bandwidth, and
 ## Builds
 
 Builds never run on GitHub (Brandon, 2026-10-29), so they use none of the organization's shared Actions minutes. A build that needs Windows is made by hand on Brandon's PC: in `windows-configurator\`, `build_gui.ps1` (PyInstaller) for `CCI_New_PC_Setup_v<VERSION>.exe`, `build.ps1` (ps2exe) for `configure-windows.exe`, then `package_release.ps1` for the release zip. The `release.yml` workflow that built and released on a `v*` tag was removed on 2026-10-29. Don't move it to GitHub Actions or any other cloud runner, even if that looks easier; a Claude session runs on Linux and can't make it, so say what needs building and let Brandon run it.
+
+## Read-only repos
+
+PublicDocumentation and every Stagehand and Spikemark repo are read only (Brandon, 2026-10-29): read them as sources, but never commit, push, branch, open pull requests or issues, comment, or add settings or workflow files there. Changes they need go to Brandon as a note (in Rada-Training-and-Docs: `REVIEW-NOTES.md` or `ACTION-ITEMS.md`).
